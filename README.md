@@ -15,12 +15,25 @@ it visible. Reach out if you’re interested, I don’t really think I can
 write a Zarr implementation, but I can write a toy version with enough
 chops to show what’s happening to folks who know R.
 
-Also maybe we can do the kerchunk referencing thing with some example
-NetCDF files.
-
 For now I’m sticking with 3D only because it’s easy to think about and
 show easy illustrations, little chunks of RGB array so I know I have
 something sensible and not just one of those sliding tile games.
+
+You can watch me slowly increment this to something useful, I’m obsessed
+with how cool Zarr is how it is composed of very general pieces. (And, I
+know about {Rarr} and {pizarr} and GDAL multidim and stars and terra,
+not wanting to undercut those this is just a learning exercise for now).
+
+## TODO
+
+- n-d tiling (generalize {grout})
+- create json metadata
+- create parquet metadata
+- make an example that avoids degenerate coordinate referencing …
+- encoding of chunks and read/write
+
+Also maybe we can do the kerchunk referencing thing with some example
+NetCDF files.
 
 ``` r
 f <- system.file("img", "Rlogo.png", package="png", mustWork = TRUE)
@@ -33,27 +46,29 @@ dim(a)
 
 ``` r
 
+## let's transpose and flip
+a <- aperm(a, c(2, 1, 3))
 ## we have a tiling logic, let's go for 26x25x4
 
 ## hypertidy/grout on github
-tiling <- grout::grout(dim(a)[1:2], blocksize = c(26, 25))
+tiling <- grout::grout(dim(a)[1:2], blocksize = c(25, 26))
 idx <- grout::tile_index(tiling)
 idx
 #> # A tibble: 12 × 11
 #>     tile offset_x offset_y tile_col tile_row  ncol  nrow  xmin  xmax  ymin  ymax
 #>    <int>    <dbl>    <dbl>    <dbl>    <dbl> <dbl> <dbl> <dbl> <dbl> <dbl> <dbl>
-#>  1     1        0        0        1        1    26    25     0    26    75   100
-#>  2     2       26        0        2        1    26    25    26    52    75   100
-#>  3     3       52        0        3        1    24    25    52    76    75   100
-#>  4     4        0       25        1        2    26    25     0    26    50    75
-#>  5     5       26       25        2        2    26    25    26    52    50    75
-#>  6     6       52       25        3        2    24    25    52    76    50    75
-#>  7     7        0       50        1        3    26    25     0    26    25    50
-#>  8     8       26       50        2        3    26    25    26    52    25    50
-#>  9     9       52       50        3        3    24    25    52    76    25    50
-#> 10    10        0       75        1        4    26    25     0    26     0    25
-#> 11    11       26       75        2        4    26    25    26    52     0    25
-#> 12    12       52       75        3        4    24    25    52    76     0    25
+#>  1     1        0        0        1        1    25    26     0    25    50    76
+#>  2     2       25        0        2        1    25    26    25    50    50    76
+#>  3     3       50        0        3        1    25    26    50    75    50    76
+#>  4     4       75        0        4        1    25    26    75   100    50    76
+#>  5     5        0       26        1        2    25    26     0    25    24    50
+#>  6     6       25       26        2        2    25    26    25    50    24    50
+#>  7     7       50       26        3        2    25    26    50    75    24    50
+#>  8     8       75       26        4        2    25    26    75   100    24    50
+#>  9     9        0       52        1        3    25    24     0    25     0    24
+#> 10    10       25       52        2        3    25    24    25    50     0    24
+#> 11    11       50       52        3        3    25    24    50    75     0    24
+#> 12    12       75       52        4        3    25    24    75   100     0    24
 ```
 
 ``` r
@@ -97,7 +112,7 @@ split_array_blocks <- function(x, index, n3 = 4) {
 l <- split_array_blocks(a, idx)
 
 ## ok so we're not n-dimension yet
-chunk <- apply(cbind(idx$tile_col - 1, idx$tile_row - 1, 0), 1, paste0, collapse = ".")
+chunk <- apply(cbind(idx$tile_row - 1, idx$tile_col - 1, 0), 1, paste0, collapse = ".")
 ```
 
 That indexing for the chunks 0.0.0 –\> 2.3.0 will hold the implicit
