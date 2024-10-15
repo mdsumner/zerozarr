@@ -30,16 +30,17 @@ not wanting to undercut those this is just a learning exercise for now).
 - create json metadata
 - create parquet metadata
 - make an example that avoids degenerate coordinate referencing …
-- encoding of chunks and read/write
+- encoding of chunks and read/write (we have write-via-GDAL and read via
+  r-lib/archive, but only with NONE or GZIP compression)
 
 Also maybe we can do the kerchunk referencing thing with some example
 NetCDF files.
 
 ``` r
-f <- system.file("img", "Rlogo.png", package="png", mustWork = TRUE)
+pngfile <- system.file("img", "Rlogo.png", package="png", mustWork = TRUE)
 
 ## we have this massive array
-a <- fastpng::read_png(f)
+a <- fastpng::read_png(pngfile)
 dim(a)
 #> [1]  76 100   4
 ```
@@ -109,10 +110,10 @@ split_array_blocks <- function(x, index, n3 = 4) {
 ## this is the list of 0.0.0 0.1.0 1.0.0 1.1.0 ... 2.3.0 
 ## blocks, there are 3 tile columns, and 4 tile rows, and 1 tile in z
 ## so we go up as far as 2.3.0
-l <- split_array_blocks(a, idx)
+listarr <- split_array_blocks(a, idx)
 
 ## ok so we're not n-dimension yet
-chunk <- apply(cbind(idx$tile_row - 1, idx$tile_col - 1, 0), 1, paste0, collapse = ".")
+chunk <- apply(cbind(0, idx$tile_row - 1, idx$tile_col - 1), 1, paste0, collapse = ".")
 ```
 
 That indexing for the chunks 0.0.0 –\> 2.3.0 will hold the implicit
@@ -122,12 +123,14 @@ We also have an xmin/xmax/ymin/ymax for each chunk, which is extremely
 convenient.
 
 ``` r
-par(bg = "grey35")
+mar <- c(2.8, 2.5, 0, 0)
+cex.axis <- .5
+op <- par(bg = "grey35", mar = mar, cex.axis = cex.axis)
 plot(NA, xlab = "", ylab = "", asp = 1,
      xlim = c(0, max(idx$xmax)), ylim = c(0, max(idx$ymax)))
-for (i in seq_along(l)) {
+for (i in seq_along(listarr)) {
   ex <- unlist(idx[i, c("xmin", "xmax", "ymin", "ymax")])
-  ximage::ximage(aperm(l[[i]], c(2, 1, 3)), ex, add = TRUE)
+  ximage::ximage(aperm(listarr[[i]], c(2, 1, 3)), ex, add = TRUE)
   p <- c(mean(ex[1:2]), mean(ex[3:4]))
   vaster::plot_extent(ex, add = TRUE)
   text(p[1], p[2], lab = chunk[i], cex = 2, col = "hotpink")
@@ -136,3 +139,70 @@ for (i in seq_along(l)) {
 ```
 
 <img src="man/figures/README-plot-1.png" width="100%" />
+
+``` r
+par(op)
+```
+
+Now, let’s create an actual ZARR in version 3 with GDAL, each block has
+GZIP compression. We roundtrip our PNG file into a Zarr store, and plot
+in the same way as we did with our manually split array above.
+
+``` r
+Rlogo.zarr <- file.path(tempdir(), "Rlogo.zarr")
+
+unlink(Rlogo.zarr, recursive = TRUE)
+
+block <- c(25, 26, 4)
+blk <- paste0(rev(block), collapse= ",")
+
+
+## COMPRESS = NONE/BLOSC/ZLIB/GZIP/LZMA/ZSTD/LZ4]  (no ZLIB, LZMA, ZSTD, LZ4 with ZARR_V3)
+## filter ‘none’, ‘gzip’, ‘bzip2’, ‘compress’, ‘lzma’, ‘xz’, ‘uuencode’, ‘lzip’, ‘lrzip’, ‘lzop’, ‘grzip’, ‘lz4’, ‘zstd’.
+system(glue::glue("
+       gdal_translate {pngfile} {Rlogo.zarr} -of ZARR -co INTERLEAVE=BAND  -co COMPRESS=GZIP -co BLOCKSIZE={blk} -co FORMAT=ZARR_V3
+"))
+
+
+
+files <- fs::dir_ls("Rlogo.zarr/",  recurse = TRUE, regexp = "Rlogo.zarr/Rlogo/c/[0-9]", type = "f")
+files
+#> Rlogo.zarr/Rlogo/c/0/0/0 Rlogo.zarr/Rlogo/c/0/0/1 Rlogo.zarr/Rlogo/c/0/0/2 
+#> Rlogo.zarr/Rlogo/c/0/0/3 Rlogo.zarr/Rlogo/c/0/1/0 Rlogo.zarr/Rlogo/c/0/1/1 
+#> Rlogo.zarr/Rlogo/c/0/1/2 Rlogo.zarr/Rlogo/c/0/1/3 Rlogo.zarr/Rlogo/c/0/2/0 
+#> Rlogo.zarr/Rlogo/c/0/2/1 Rlogo.zarr/Rlogo/c/0/2/2 Rlogo.zarr/Rlogo/c/0/2/3
+```
+
+``` r
+
+op <- par(bg = "grey35", mar = mar, cex.axis = cex.axis)
+## setup out plot as before
+plot(NA, xlab = "", ylab = "", asp = 1,
+     xlim = c(0, max(idx$xmax)), ylim = c(0, max(idx$ymax)))
+
+
+## in this loop, 'ar' is now identical to the corresponding element in 
+for (i in seq_along(files)) {
+  ar <- readBin(archive::file_read(files[i], mode = "rb"), "integer", size = 1, n = prod(block), signed = FALSE)
+  ex <- unlist(idx[i, c("xmin", "xmax", "ymin", "ymax")])
+  ximage::ximage(aperm(array(ar, block), c(2, 1, 3)), ex, add = TRUE)
+  p <- c(mean(ex[1:2]), mean(ex[3:4]))
+  vaster::plot_extent(ex, add = TRUE)
+  
+  text(p[1], p[2], lab = gsub("Rlogo.zarr", ".", files[i]), cex = 1, col = "hotpink")
+  
+}
+```
+
+<img src="man/figures/README-realzarr-1.png" width="100%" />
+
+``` r
+par(op)
+```
+
+## Code of Conduct
+
+Please note that the zerozarr project is released with a [Contributor
+Code of
+Conduct](https://contributor-covenant.org/version/2/1/CODE_OF_CONDUCT.html).
+By contributing to this project, you agree to abide by its terms.
