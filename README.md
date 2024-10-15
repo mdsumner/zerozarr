@@ -165,12 +165,20 @@ system(glue::glue("
 
 
 
-files <- fs::dir_ls("Rlogo.zarr/",  recurse = TRUE, regexp = "Rlogo.zarr/Rlogo/c/[0-9]", type = "f")
+files <- fs::dir_ls(Rlogo.zarr,  recurse = TRUE, regexp = "Rlogo.zarr/Rlogo/c/[0-9]", type = "f")
 files
-#> Rlogo.zarr/Rlogo/c/0/0/0 Rlogo.zarr/Rlogo/c/0/0/1 Rlogo.zarr/Rlogo/c/0/0/2 
-#> Rlogo.zarr/Rlogo/c/0/0/3 Rlogo.zarr/Rlogo/c/0/1/0 Rlogo.zarr/Rlogo/c/0/1/1 
-#> Rlogo.zarr/Rlogo/c/0/1/2 Rlogo.zarr/Rlogo/c/0/1/3 Rlogo.zarr/Rlogo/c/0/2/0 
-#> Rlogo.zarr/Rlogo/c/0/2/1 Rlogo.zarr/Rlogo/c/0/2/2 Rlogo.zarr/Rlogo/c/0/2/3
+#> /perm_storage/home/data/r_tmp/RtmpplTdSd/Rlogo.zarr/Rlogo/c/0/0/0
+#> /perm_storage/home/data/r_tmp/RtmpplTdSd/Rlogo.zarr/Rlogo/c/0/0/1
+#> /perm_storage/home/data/r_tmp/RtmpplTdSd/Rlogo.zarr/Rlogo/c/0/0/2
+#> /perm_storage/home/data/r_tmp/RtmpplTdSd/Rlogo.zarr/Rlogo/c/0/0/3
+#> /perm_storage/home/data/r_tmp/RtmpplTdSd/Rlogo.zarr/Rlogo/c/0/1/0
+#> /perm_storage/home/data/r_tmp/RtmpplTdSd/Rlogo.zarr/Rlogo/c/0/1/1
+#> /perm_storage/home/data/r_tmp/RtmpplTdSd/Rlogo.zarr/Rlogo/c/0/1/2
+#> /perm_storage/home/data/r_tmp/RtmpplTdSd/Rlogo.zarr/Rlogo/c/0/1/3
+#> /perm_storage/home/data/r_tmp/RtmpplTdSd/Rlogo.zarr/Rlogo/c/0/2/0
+#> /perm_storage/home/data/r_tmp/RtmpplTdSd/Rlogo.zarr/Rlogo/c/0/2/1
+#> /perm_storage/home/data/r_tmp/RtmpplTdSd/Rlogo.zarr/Rlogo/c/0/2/2
+#> /perm_storage/home/data/r_tmp/RtmpplTdSd/Rlogo.zarr/Rlogo/c/0/2/3
 ```
 
 ``` r
@@ -189,7 +197,7 @@ for (i in seq_along(files)) {
   p <- c(mean(ex[1:2]), mean(ex[3:4]))
   vaster::plot_extent(ex, add = TRUE)
   
-  text(p[1], p[2], lab = gsub("Rlogo.zarr", ".", files[i]), cex = 1, col = "hotpink")
+  text(p[1], p[2], lab = gsub(file.path(dirname(Rlogo.zarr), "Rlogo.zarr"), ".", files[i]), cex = 1, col = "hotpink")
   
 }
 ```

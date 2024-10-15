@@ -132,7 +132,7 @@ system(glue::glue("
 
 
 
-files <- fs::dir_ls("Rlogo.zarr/",  recurse = TRUE, regexp = "Rlogo.zarr/Rlogo/c/[0-9]", type = "f")
+files <- fs::dir_ls(Rlogo.zarr,  recurse = TRUE, regexp = "Rlogo.zarr/Rlogo/c/[0-9]", type = "f")
 files
 
 op <- par(bg = "grey35", mar = mar, cex.axis = cex.axis)
@@ -149,7 +149,7 @@ for (i in seq_along(files)) {
   p <- c(mean(ex[1:2]), mean(ex[3:4]))
   vaster::plot_extent(ex, add = TRUE)
   
-  text(p[1], p[2], lab = gsub("Rlogo.zarr", ".", files[i]), cex = 1, col = "hotpink")
+  text(p[1], p[2], lab = gsub(file.path(dirname(Rlogo.zarr), "Rlogo.zarr"), ".", files[i]), cex = 1, col = "hotpink")
   
 }
 par(op)
