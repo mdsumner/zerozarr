@@ -171,10 +171,12 @@ Note that the V3 Zarr store is structured differently with nested dirs, not just
 
 Here we create another Zarr store from the PNG, but this time it's done with xarray. 
 
-(though we still pass the PNG to xarray via GDAL)
-
 We pass the PNG to xarray (via rioxarray ( via rasterio (via GDAL))) and then use it 
-to write to Zarr with whatever encoding it chooses.  This is now Zarr V3 because that's still the xarray default for the version I'm using. 
+to write to Zarr with a compression we choose.  This is now Zarr V3 because that's still the xarray default for the version I'm using. 
+
+(weird to use GDAL but xarray doesn't yet have an engine for PNG afaik, though it could possibly use VirtualiZarr to reference the PNG chunks, which we might try )
+
+I'm using reticulate because I can use R for the hard (to me) stuff and make documents. 
 
 ```{r with-xarray}
 library(reticulate)

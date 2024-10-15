@@ -212,12 +212,17 @@ not just dotted files in one big directory.
 Here we create another Zarr store from the PNG, but this time it’s done
 with xarray.
 
-(though we still pass the PNG to xarray via GDAL)
-
 We pass the PNG to xarray (via rioxarray ( via rasterio (via GDAL))) and
-then use it to write to Zarr with whatever encoding it chooses. This is
-now Zarr V3 because that’s still the xarray default for the version I’m
+then use it to write to Zarr with a compression we choose. This is now
+Zarr V3 because that’s still the xarray default for the version I’m
 using.
+
+(weird to use GDAL but xarray doesn’t yet have an engine for PNG afaik,
+though it could possibly use VirtualiZarr to reference the PNG chunks,
+which we might try )
+
+I’m using reticulate because I can use R for the hard (to me) stuff and
+make documents.
 
 ``` r
 library(reticulate)
@@ -231,7 +236,7 @@ compressor <-  zarr$GZip(level = 6L)
 enc <- list(band_data =  list(compressor  = compressor))
 unlink("xarray_gzip6.zarr/", recursive = TRUE)
 ds$to_zarr("xarray_gzip6.zarr", encoding = enc)
-#> <xarray.backends.zarr.ZarrStore object at 0x7f5b18dcacc0>
+#> <xarray.backends.zarr.ZarrStore object at 0x7fa945bc2cc0>
 ```
 
 ``` r
