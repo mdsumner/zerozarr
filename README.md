@@ -40,7 +40,9 @@ NetCDF files.
 pngfile <- system.file("img", "Rlogo.png", package="png", mustWork = TRUE)
 
 ## we have this massive array
-a <- fastpng::read_png(pngfile)
+a <- fastpng::read_png(pngfile) * 255
+mode(a) <- "integer"
+
 dim(a)
 #> [1]  76 100   4
 ```
@@ -78,7 +80,7 @@ idx
 plot(tiling)
 ```
 
-<img src="man/figures/README-unnamed-chunk-2-1.png" width="100%" />
+<img src="man/figures/README-first-1.png" width="100%" />
 
 ``` r
 
@@ -89,7 +91,7 @@ subset_3d_array <- function(x, offset, size) {
 }
 ## offset and size are the values in idx
 str(subset_3d_array(a, c(0, 0, 0), c(26, 25, 4)))
-#>  num [1:26, 1:25, 1:4] 0 0 0 0 0 0 0 0 0 0 ...
+#>  int [1:26, 1:25, 1:4] 0 0 0 0 0 0 0 0 0 0 ...
 ```
 
 ``` r
@@ -138,7 +140,7 @@ for (i in seq_along(listarr)) {
 }
 ```
 
-<img src="man/figures/README-plot-1.png" width="100%" />
+<img src="man/figures/README-plot0-1.png" width="100%" />
 
 ``` r
 par(op)
@@ -151,7 +153,6 @@ in the same way as we did with our manually split array above.
 ``` r
 Rlogo.zarr <- file.path(tempdir(), "Rlogo.zarr")
 
-unlink(Rlogo.zarr, recursive = TRUE)
 
 block <- c(25, 26, 4)
 blk <- paste0(rev(block), collapse= ",")
@@ -165,23 +166,10 @@ system(glue::glue("
 
 
 
-files <- fs::dir_ls(Rlogo.zarr,  recurse = TRUE, regexp = "Rlogo.zarr/Rlogo/c/[0-9]", type = "f")
-files
-#> /perm_storage/home/data/r_tmp/RtmpplTdSd/Rlogo.zarr/Rlogo/c/0/0/0
-#> /perm_storage/home/data/r_tmp/RtmpplTdSd/Rlogo.zarr/Rlogo/c/0/0/1
-#> /perm_storage/home/data/r_tmp/RtmpplTdSd/Rlogo.zarr/Rlogo/c/0/0/2
-#> /perm_storage/home/data/r_tmp/RtmpplTdSd/Rlogo.zarr/Rlogo/c/0/0/3
-#> /perm_storage/home/data/r_tmp/RtmpplTdSd/Rlogo.zarr/Rlogo/c/0/1/0
-#> /perm_storage/home/data/r_tmp/RtmpplTdSd/Rlogo.zarr/Rlogo/c/0/1/1
-#> /perm_storage/home/data/r_tmp/RtmpplTdSd/Rlogo.zarr/Rlogo/c/0/1/2
-#> /perm_storage/home/data/r_tmp/RtmpplTdSd/Rlogo.zarr/Rlogo/c/0/1/3
-#> /perm_storage/home/data/r_tmp/RtmpplTdSd/Rlogo.zarr/Rlogo/c/0/2/0
-#> /perm_storage/home/data/r_tmp/RtmpplTdSd/Rlogo.zarr/Rlogo/c/0/2/1
-#> /perm_storage/home/data/r_tmp/RtmpplTdSd/Rlogo.zarr/Rlogo/c/0/2/2
-#> /perm_storage/home/data/r_tmp/RtmpplTdSd/Rlogo.zarr/Rlogo/c/0/2/3
-```
+files <- fs::dir_ls(Rlogo.zarr,  recurse = TRUE,  type = "f")
+keep <- grepl("^[0-9]", basename(files))
 
-``` r
+files <- file.path(dirname(files[keep]), basename(files[keep]))
 
 op <- par(bg = "grey35", mar = mar, cex.axis = cex.axis)
 ## setup out plot as before
@@ -206,6 +194,78 @@ for (i in seq_along(files)) {
 
 ``` r
 par(op)
+```
+
+Here we create another Zarr store from the PNG, but this time it’s done
+with xarray.
+
+We pass the PNG to xarray (via rioxarray ( via rasterio (via GDAL))) and
+then use it to write to Zarr with whatever encoding it chooses.
+
+``` r
+library(reticulate)
+xarray <- import("xarray")
+zarr <- import("zarr")
+
+
+pngfile <- system.file("img", "Rlogo.png", package="png", mustWork = TRUE)
+ds <- xarray$open_dataset(pngfile, chunks = list(band = 4, y= 26, x = 25), mask_and_scale = FALSE)
+compressor <-  zarr$GZip(level = 6L)
+enc <- list(band_data =  list(compressor  = compressor))
+unlink("xarray_gzip6.zarr/", recursive = TRUE)
+ds$to_zarr("xarray_gzip6.zarr", encoding = enc)
+#> <xarray.backends.zarr.ZarrStore object at 0x7fc9dcae6cc0>
+```
+
+``` r
+
+## now let's read it
+files <- fs::dir_ls("xarray_gzip6.zarr/band_data", recurse = TRUE, type = "f") 
+files <- files[grepl("^[0-9]", basename(files))]
+files
+#> xarray_gzip6.zarr/band_data/0.0.0 xarray_gzip6.zarr/band_data/0.0.1 
+#> xarray_gzip6.zarr/band_data/0.0.2 xarray_gzip6.zarr/band_data/0.0.3 
+#> xarray_gzip6.zarr/band_data/0.1.0 xarray_gzip6.zarr/band_data/0.1.1 
+#> xarray_gzip6.zarr/band_data/0.1.2 xarray_gzip6.zarr/band_data/0.1.3 
+#> xarray_gzip6.zarr/band_data/0.2.0 xarray_gzip6.zarr/band_data/0.2.1 
+#> xarray_gzip6.zarr/band_data/0.2.2 xarray_gzip6.zarr/band_data/0.2.3
+```
+
+And now set up a different kind of plot for each chunk.
+
+``` r
+block <- c(25, 26, 4)
+
+par(mfrow = c(3, 4), mar = c(0.2, 0.2, 3, 0.2))
+for (i in seq_along(files)) {
+chunkvalues <- readBin(archive::file_read(files[i], mode = "rb"), 
+        "integer", size = 1, signed = FALSE, n = prod(block))
+
+ximage::ximage(aperm(array(chunkvalues, block), c(2, 1, 3)), axes = F, ylab = "", xlab = "")
+title(basename(files[i]))
+box(lty = 2)
+#scan("", 1)
+}
+```
+
+<img src="man/figures/README-plot-1.png" width="100%" />
+
+Let’s just check what the encoding of the Zarr is from different
+directions.
+
+``` r
+jsonlite::fromJSON("xarray_gzip6.zarr/.zmetadata")$metadata[["band_data/.zarray"]]$compressor
+#> $id
+#> [1] "gzip"
+#> 
+#> $level
+#> [1] 6
+```
+
+``` r
+
+xarray$open_dataset("xarray_gzip6.zarr")$band_data$encoding$compressor
+#> GZip(level=6)
 ```
 
 ## Code of Conduct
