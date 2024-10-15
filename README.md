@@ -36,6 +36,12 @@ not wanting to undercut those this is just a learning exercise for now).
 Also maybe we can do the kerchunk referencing thing with some example
 NetCDF files.
 
+## Split up a PNG file, an RGBA array
+
+This array is 100x76x4. We take that base 2D grid 100x76 and break it
+into 12 chunks, and we have a record of the tiling/chunking for easy
+reference (all that logic is implicit in the Zarr metadata eventually).
+
 ``` r
 pngfile <- system.file("img", "Rlogo.png", package="png", mustWork = TRUE)
 
@@ -146,6 +152,8 @@ for (i in seq_along(listarr)) {
 par(op)
 ```
 
+## Create a Real Zarr, with GDAL from PNG file
+
 Now, let’s create an actual ZARR in version 3 with GDAL, each block has
 GZIP compression. We roundtrip our PNG file into a Zarr store, and plot
 in the same way as we did with our manually split array above.
@@ -177,7 +185,7 @@ plot(NA, xlab = "", ylab = "", asp = 1,
      xlim = c(0, max(idx$xmax)), ylim = c(0, max(idx$ymax)))
 
 
-## in this loop, 'ar' is now identical to the corresponding element in 
+## in this loop, 'ar' is now identical to the corresponding element in  'listarr' above
 for (i in seq_along(files)) {
   ar <- readBin(archive::file_read(files[i], mode = "rb"), "integer", size = 1, n = prod(block), signed = FALSE)
   ex <- unlist(idx[i, c("xmin", "xmax", "ymin", "ymax")])
@@ -196,11 +204,20 @@ for (i in seq_along(files)) {
 par(op)
 ```
 
+Note that the V3 Zarr store is structured differently with nested dirs,
+not just dotted files in one big directory.
+
+## Create a Real Zarr, with xarray
+
 Here we create another Zarr store from the PNG, but this time it’s done
 with xarray.
 
+(though we still pass the PNG to xarray via GDAL)
+
 We pass the PNG to xarray (via rioxarray ( via rasterio (via GDAL))) and
-then use it to write to Zarr with whatever encoding it chooses.
+then use it to write to Zarr with whatever encoding it chooses. This is
+now Zarr V3 because that’s still the xarray default for the version I’m
+using.
 
 ``` r
 library(reticulate)
@@ -214,7 +231,7 @@ compressor <-  zarr$GZip(level = 6L)
 enc <- list(band_data =  list(compressor  = compressor))
 unlink("xarray_gzip6.zarr/", recursive = TRUE)
 ds$to_zarr("xarray_gzip6.zarr", encoding = enc)
-#> <xarray.backends.zarr.ZarrStore object at 0x7fc9dcae6cc0>
+#> <xarray.backends.zarr.ZarrStore object at 0x7f5b18dcacc0>
 ```
 
 ``` r
@@ -267,6 +284,10 @@ jsonlite::fromJSON("xarray_gzip6.zarr/.zmetadata")$metadata[["band_data/.zarray"
 xarray$open_dataset("xarray_gzip6.zarr")$band_data$encoding$compressor
 #> GZip(level=6)
 ```
+
+## More soon!
+
+…
 
 ## Code of Conduct
 
